@@ -1,0 +1,14 @@
+venv/
+venv_gpu/
+__pycache__/
+*.pyc
+*.pth
+*.pt
+*.png
+*.jpg
+*.jpeg
+dataset/
+results/
+saved_models/
+test_results/
+.cache/
