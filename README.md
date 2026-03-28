@@ -1,3 +1,4 @@
+
 # Zero-Shot Anti-Disguise Facial Reconstruction using GANs
 
 ## Project Goal
@@ -45,3 +46,4 @@ The result will display the Original Image, Disguised Image, and Reconstructed f
 
 ## Ethical Note
 **Important:** This system is designed for **research purposes and security enhancement only**. All users must strictly adhere to privacy regulations and laws regarding biometric data and facial generation. Misuse for identity falsification or unauthorized surveillance is strictly condemned.
+
