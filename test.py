@@ -1,6 +1,9 @@
 import argparse
+from fileinput import filename
 import os
 import sys
+from skimage.metrics import peak_signal_noise_ratio, structural_similarity
+import cv2
 
 # Fix import path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -14,7 +17,7 @@ import glob
 from models.generator import Generator
 
 
-def test_single(model, image_path, transform, device, output_dir):
+'''def test_single(model, image_path, transform, device, output_dir):
     """Test on a single masked image and save the result."""
     if not os.path.exists(image_path):
         print(f"❌ Image not found: {image_path}")
@@ -51,6 +54,67 @@ def test_single(model, image_path, transform, device, output_dir):
     )
 
     print(f"  ✅ Saved: {output_path}")
+    return output_path  '''
+
+def test_single(model, image_path, transform, device, output_dir):
+    """Test single image + calculate PSNR & SSIM"""
+
+    if not os.path.exists(image_path):
+        print(f"❌ Image not found: {image_path}")
+        return
+
+    # Load input
+    img = Image.open(image_path).convert("RGB")
+    input_tensor = transform(img).unsqueeze(0).to(device)
+
+    # Generate output
+    with torch.no_grad():
+        output = model(input_tensor)
+
+    # Save output
+    basename = os.path.splitext(os.path.basename(image_path))[0]
+    output_path = os.path.join(output_dir, f"{basename}_unmasked.png")
+
+    vutils.save_image(
+        output,
+        output_path,
+        normalize=True,
+        value_range=(-1, 1)
+    )
+
+    # ===============================
+    # 🔥 PSNR & SSIM CALCULATION
+    # ===============================
+
+    # Ground truth path
+    filename = os.path.basename(image_path)
+    gt_path = os.path.join("dataset/real", filename)
+
+    if os.path.exists(gt_path):
+
+        real = cv2.imread(gt_path)
+        generated = cv2.imread(output_path)
+
+        real = cv2.resize(real, (256, 256))
+        generated = cv2.resize(generated, (256, 256))
+
+        # PSNR
+        psnr_value = peak_signal_noise_ratio(real, generated)
+
+        # SSIM (grayscale)
+        real_gray = cv2.cvtColor(real, cv2.COLOR_BGR2GRAY)
+        gen_gray = cv2.cvtColor(generated, cv2.COLOR_BGR2GRAY)
+
+        ssim_value = structural_similarity(real_gray, gen_gray)
+
+        print(f"  📊 PSNR: {psnr_value:.2f}")
+        print(f"  📊 SSIM: {ssim_value:.4f}")
+
+    else:
+        print("  ⚠️ Ground truth not found → skipping metrics")
+
+    print(f"  ✅ Saved: {output_path}")
+
     return output_path
 
 
