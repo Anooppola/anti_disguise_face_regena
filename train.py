@@ -14,6 +14,8 @@ from torch.optim import Adam  # type: ignore
 from torch.optim.lr_scheduler import StepLR  # type: ignore
 import torchvision.utils as vutils  # type: ignore
 from torchvision.models import vgg19, VGG19_Weights  # type: ignore
+import mlflow
+import mlflow.pytorch
 
 from data_loader import get_dataloader  # type: ignore
 from models.generator import Generator  # type: ignore
@@ -68,6 +70,14 @@ def train():
 
     os.makedirs('saved_models', exist_ok=True)
     os.makedirs('results', exist_ok=True)
+
+    # ============================================================
+    # MLOps: Start MLflow Tracking
+    # ============================================================
+    mlflow.set_tracking_uri("sqlite:///mlflow.db")
+    mlflow.set_experiment("Anti-Disguise-GAN")
+    mlflow.start_run()
+    mlflow.log_params(vars(opt))
 
     # ============================================================
     # Device Setup
@@ -246,6 +256,13 @@ def train():
         print("  Avg D_loss: {:.4f}  |  Avg G_loss: {:.4f}".format(avg_d, avg_g))
         print("-" * 60 + "\n")
 
+        # ========================================================
+        # MLOps: Log Epoch Metrics
+        # ========================================================
+        mlflow.log_metric("D_loss", avg_d, step=epoch)
+        mlflow.log_metric("G_loss", avg_g, step=epoch)
+        mlflow.log_metric("learning_rate", scheduler_G.get_last_lr()[0], step=epoch)
+
         # Save checkpoints
         if (epoch + 1) % opt.save_interval == 0:
             torch.save(generator.state_dict(),
@@ -264,6 +281,10 @@ def train():
     # Save final
     torch.save(generator.state_dict(), "saved_models/generator_final.pth")
     torch.save(discriminator.state_dict(), "saved_models/discriminator_final.pth")
+
+    # MLOps: Log Model and End Run
+    mlflow.pytorch.log_model(generator, "models/generator")
+    mlflow.end_run()
 
     print("\n" + "=" * 60)
     print("  Training Completed!")

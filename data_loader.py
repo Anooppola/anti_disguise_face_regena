@@ -46,7 +46,7 @@ class PairedFaceDataset(Dataset):
                 f"  Make sure filenames match (e.g., M0012.png ↔ UM0012.png or same names)."
             )
 
-        print(f"✅ Loaded {len(self.pairs)} paired images from '{root}'")
+        print(f"  Loaded {len(self.pairs)} paired images from '{root}'")
 
         self.transform = transforms.Compose([
             transforms.Resize((image_size, image_size)),
