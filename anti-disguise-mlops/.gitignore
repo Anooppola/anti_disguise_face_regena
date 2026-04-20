@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+venv_gpu/
+env/
+
+# Data (large)
+data/
+
+# Trained models (large)
+saved_models/
+!saved_models/.gitkeep
+
+# MLflow artifacts
+mlruns/
+mlflow.db
+
+# Results / outputs
+results/
+test_results/
+*.png
+*.jpg
+*.jpeg
+
+# Env file (contains secrets)
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/

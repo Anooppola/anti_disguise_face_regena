@@ -1,0 +1,57 @@
+services:
+
+  # ── FastAPI Inference API ───────────────────────────────────────────────────
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: api
+    container_name: antidisguise_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../saved_models:/app/saved_models:ro   # mount trained models read-only
+    environment:
+      - MODEL_PATH=saved_models/generator_best.pth
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # ── MLflow Tracking Server ─────────────────────────────────────────────────
+  mlflow:
+    image: python:3.10-slim
+    container_name: antidisguise_mlflow
+    working_dir: /mlflow
+    volumes:
+      - ../mlflow.db:/mlflow/mlflow.db
+      - ../mlruns:/mlflow/mlruns
+    command: >
+      sh -c "pip install mlflow --quiet &&
+             mlflow ui
+               --host 0.0.0.0
+               --port 5000
+               --backend-store-uri sqlite:///mlflow.db
+               --default-artifact-root /mlflow/mlruns"
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+
+  # ── Streamlit Frontend ────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: frontend
+    container_name: antidisguise_frontend
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000
+    depends_on:
+      - api
+    restart: unless-stopped
