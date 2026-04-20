@@ -1,148 +1,317 @@
-# Zero-Shot Anti-Disguise Facial Reconstruction using GANs (Production Edition)
+# 🎭 Anti-Disguise Face Reconstruction — DevOps + MLOps Pipeline
 
-## Project Goal
-This deep learning project builds a system that reconstructs hidden facial regions when a face is partially occluded. As part of a final academic evaluation, this project integrates best practices in **DevOps and MLOps**. The core trained Generative Adversarial Network (GAN) has been wrapped in a production-ready FastAPI architecture, fully containerized, tracked with MLflow, and monitored with CI/CD.
-
-## 🏗️ System Architecture
-
-```text
-       [USER] (Web / Mobile / cURL)
-          │
-          ▼
-   [FastAPI Application] ──(Loads .env)──> [PyTorch Model weights]
-          │
-      --------- (Docker Container) ---------
-          │
-          ▼
-   [Inference Engine] -----> Returns Reconstructed Face Image
-          ▲
-          │
-  (GitHub Actions CI/CD) -> Automatically tests API & Builds Docker image on push
-          │
-          ▼
-    [MLflow Tracking] -----> Tracks Experiments, Logs Losses & PSNR/SSIM metrics during Training
-```
-
-## 🚀 Features (DevOps & MLOps Highlights)
-- **FastAPI**: Synchronous & async serving for high performance.
-- **Dockerized**: Containerized environment for guaranteed reproducibility.
-- **Continuous Integration**: GitHub actions validate code with PyTest before deploying.
-- **Environment Management**: Secrets injected via `.env`.
-- **MLflow Tracking**: Training hyper-parameters, loss graphs, and models are tracked implicitly.
-- **Structured Logging**: Standard Python logging logs inference latencies and model loading exceptions.
+> **Pix2Pix GAN** system that reconstructs unmasked faces from masked/occluded inputs — with a complete production-grade DevOps and MLOps stack.
 
 ---
 
-## 🛠️ Step-by-step Local Run Instructions
+## 📋 Table of Contents
 
-### 1. Setup Environment
-Ensure Python 3.10 is installed.
-
-```bash
-# Create a virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 2. Configure `.env`
-Create a `.env` file in the root if not present:
-```env
-MODEL_PATH=saved_models/generator_best.pth
-PORT=8000
-HOST=0.0.0.0
-```
-
-### 3. Run the FastAPI Application
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-You can view the interactive Swagger API docs at: `http://localhost:8000/docs`
+1. [Project Overview](#-project-overview)  
+2. [Architecture](#-architecture)  
+3. [Project Structure](#-project-structure)  
+4. [Quick Start](#-quick-start)  
+5. [Docker Usage](#-docker-usage)  
+6. [MLflow Tracking](#-mlflow-tracking)  
+7. [API Usage](#-api-usage)  
+8. [Frontend Usage](#-frontend-usage)  
+9. [CI/CD Pipeline](#-cicd-pipeline)  
+10. [Training](#-training)  
+11. [Evaluation Metrics](#-evaluation-metrics)  
 
 ---
 
-## 🐳 Running with Docker
+## 🔍 Project Overview
 
-Instead of installing Python dependencies manually, you can run the entire solution via Docker!
+| Component | Technology |
+|-----------|-----------|
+| Deep Learning | PyTorch — Pix2Pix GAN |
+| Backend API | FastAPI |
+| Frontend | Streamlit |
+| Experiment Tracking | MLflow |
+| Containerization | Docker + Docker Compose |
+| CI/CD | GitHub Actions |
+| Metrics | PSNR, SSIM, Precision, Recall, F1 |
 
-### Method A: Docker Compose (Recommended)
+---
+
+## 🏗 Architecture
+
+```
+Masked Face (256×256)
+        │
+        ▼
+ ┌──────────────┐     adversarial    ┌─────────────────────┐
+ │  U-Net       │ ◄───────────────── │  PatchGAN           │
+ │  Generator   │                    │  Discriminator 70×70│
+ └──────┬───────┘                    └─────────────────────┘
+        │ L1 + Perceptual (VGG19) + Adversarial
+        ▼
+Reconstructed Face (256×256)
+```
+
+**Loss functions:**
+- `L_G = L_adv + λ_L1 × L_L1 + λ_percep × L_percep`
+- `L_adv` — LSGAN (MSE-based adversarial)
+- `L_L1` — Pixel-wise MAE (λ=100)
+- `L_percep` — VGG19 feature MAE (λ=10)
+
+---
+
+## 📁 Project Structure
+
+```
+anti-disguise-mlops/
+├── data/
+│   ├── masked/          ← M0001.png, M0002.png …
+│   └── unmasked/        ← UM0001.png, UM0002.png …
+├── src/
+│   ├── model.py         ← Generator + Discriminator + VGGPerceptualLoss
+│   ├── data_loader.py   ← Paired dataset + DataLoader factory
+│   ├── preprocessing.py ← Image pre/post-processing utilities
+│   ├── train.py         ← Full training loop with MLflow
+│   ├── evaluate.py      ← PSNR, SSIM, F1 metrics
+│   └── inference.py     ← InferenceEngine class
+├── mlflow_utils/
+│   ├── mlflow_utils.py  ← setup/log helpers
+│   ├── track_experiments.py ← test-run script
+│   └── run_mlflow_ui.py ← launch MLflow server
+├── api/
+│   └── app.py           ← FastAPI backend
+├── frontend/
+│   └── streamlit_app.py ← Streamlit UI
+├── docker/
+│   ├── Dockerfile       ← Multi-stage (api + frontend)
+│   └── docker-compose.yml
+├── .github/workflows/
+│   └── ci-cd.yml        ← lint → test → docker build/push
+├── tests/
+│   ├── test_model.py
+│   ├── test_api.py
+│   └── test_evaluate.py
+├── saved_models/        ← place generator_best.pth here
+├── requirements.txt
+├── .env
+├── .gitignore
+└── main.py              ← CLI entry point
+```
+
+---
+
+## ⚡ Quick Start
+
+### 1. Clone & setup
+
 ```bash
+git clone https://github.com/<you>/anti-disguise-mlops.git
+cd anti-disguise-mlops
+python -m venv venv && venv\Scripts\activate   # Windows
+pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+```
+
+### 2. Add your dataset
+
+```
+data/masked/    → M0001.png, M0002.png …
+data/unmasked/  → UM0001.png, UM0002.png …
+```
+
+Files are paired by the numeric ID in the filename.
+
+### 3. Train
+
+```bash
+python main.py train --epochs 50 --batch_size 4
+```
+
+### 4. Log a test MLflow experiment (no GPU needed)
+
+```bash
+python main.py test-exp
+```
+
+### 5. Open MLflow UI
+
+```bash
+python main.py mlflow
+# → http://localhost:5000
+```
+
+### 6. Start the API
+
+```bash
+python main.py serve
+# → http://localhost:8000/docs
+```
+
+### 7. Start the frontend
+
+```bash
+python main.py frontend
+# → http://localhost:8501
+```
+
+---
+
+## 🐳 Docker Usage
+
+### Start all services with 1 command
+
+```bash
+# From project root
+cd docker
 docker-compose up --build -d
 ```
-The API is instantly available at `http://localhost:8000`. Stop it using `docker-compose down`.
 
-### Method B: Native Docker
+| Service | URL |
+|---------|-----|
+| FastAPI | http://localhost:8000 |
+| MLflow  | http://localhost:5000 |
+| Streamlit | http://localhost:8501 |
+
+### Stop all services
+
 ```bash
-docker build -t antidisguise_api:latest .
-docker run -p 8000:8000 --env-file .env antidisguise_api:latest
+docker-compose down
 ```
 
----
+### View logs
 
-## 🔗 API Testing & Usage (Viva Demonstration)
-
-The API exposes a POST `/predict` endpoint that accepts multipart form data.
-
-### Sample Input JSON
-*(Note: Because the payload accepts a file, JSON is not used directly, but equivalent metadata representation looks like:)*
-```json
-{
-  "file": "<Binary Image Data - test.jpg>"
-}
-```
-
-### cURL Example
 ```bash
-curl -X POST "http://localhost:8000/predict" \
-     -H "accept: image/png" \
-     -H "Content-Type: multipart/form-data" \
-     -F "file=@input.png" --output "reconstructed.png"
+docker-compose logs -f api
+docker-compose logs -f mlflow
+docker-compose logs -f frontend
 ```
 
-### Postman Example
-1. Open Postman, select **POST** and enter `http://localhost:8000/predict`
-2. Go to the **Body** tab, select **form-data**.
-3. Create a Key named `file`, change the Type from *Text* to *File*.
-4. Upload your test image into the Value field and click Send. The response will be the unmasked image!
+> **Note:** Place your trained `generator_best.pth` in `saved_models/` before starting.  
+> It is volume-mounted into the API container automatically.
 
 ---
 
-## ☁️ Cloud Deployment Guide (EC2 / Render)
+## 📊 MLflow Tracking
 
-### Option 1: Render / Railway (Easiest)
-1. Fork this repository to your GitHub account.
-2. Go to **Render.com** (or Railway.app), click **New Web Service**.
-3. Point to your repository branch. Ensure the environment is set to `Docker`.
-4. Add Environment Variables: `MODEL_PATH=saved_models/generator_best.pth`.
-5. Click **Deploy**. The service will build and provide a public HTTPS URL seamlessly mapping Port 8000.
+| Logged parameter | Key |
+|-----------------|-----|
+| Learning rate | `learning_rate` |
+| Batch size | `batch_size` |
+| Epochs | `epochs` |
+| L1 weight | `lambda_l1` |
+| Perceptual weight | `lambda_percep` |
 
-### Option 2: AWS EC2 (Manual)
-1. Launch an Ubuntu 22.04 t2.medium instance with public HTTP access on port 8000.
-2. SSH into your instance.
-3. Install Docker and clone the repository.
-4. Run `sudo docker-compose up --build -d`.
-5. Access your API via `http://<EC2-PUBLIC-IP>:8000`.
+| Logged metric | Description |
+|--------------|-------------|
+| `g_loss` | Generator total loss |
+| `d_loss` | Discriminator loss |
+| `psnr` | Peak Signal-to-Noise Ratio (dB) |
+| `ssim` | Structural Similarity Index |
+| `f1_score` | Discriminator F1 |
+| `best_psnr` | Best validation PSNR |
 
 ---
 
-## 🧪 MLOps: Model Tracking (MLflow)
+## 🔌 API Usage
 
-To view training performance metrics:
-1. Open a terminal and type: `mlflow ui --backend-store-uri sqlite:///mlflow.db`
-2. Visit `http://127.0.0.1:5000`
-3. The UI will show standard metrics:
-   - **Hyperparameters:** `learning_rate`, `batch_size`, `lambda_perceptual`.
-   - **Metrics:** `G_loss` (Generator Error), `D_loss` (Detector Error) evaluated sequentially per epoch.
-   - **Artifacts:** Checkpoints logged as generic PyTorch traces.
+### Health check
 
-### Unit Tests
-Execute the testing pipeline independently using PyTest:
 ```bash
-pytest tests/
+curl http://localhost:8000/
+```
+
+### Model info
+
+```bash
+curl http://localhost:8000/info
+```
+
+### Predict (reconstruct face)
+
+```bash
+curl -X POST http://localhost:8000/predict \
+     -F "file=@masked_face.png" \
+     --output reconstructed.png
+```
+
+### Python example
+
+```python
+import requests
+
+with open("masked_face.png", "rb") as f:
+    r = requests.post(
+        "http://localhost:8000/predict",
+        files={"file": ("input.png", f, "image/png")},
+    )
+
+with open("reconstructed.png", "wb") as out:
+    out.write(r.content)
 ```
 
 ---
-## Ethical Note
-**Important:** This system is designed for **research purposes and security enhancement only**. All users must strictly adhere to privacy regulations and laws regarding biometric data and facial generation. Misuse for identity falsification or unauthorized surveillance is strictly condemned.
+
+## 🖥 Frontend Usage
+
+1. Open **http://localhost:8501**
+2. Upload a masked face image (PNG/JPG)
+3. Click **🚀 Reconstruct Face**
+4. View the **before/after comparison**
+5. Download the result with **⬇️ Download Result**
+
+---
+
+## 🔄 CI/CD Pipeline
+
+On every push to `main` or PR:
+
+```
+Push / PR
+   │
+   ▼
+┌──────┐    ┌──────┐    ┌────────────────────┐
+│ Lint │ →  │ Test │ →  │ Docker Build & Push │
+│flake8│    │pytest│    │ (main branch only)  │
+│black │    │      │    │ → ghcr.io registry  │
+└──────┘    └──────┘    └────────────────────┘
+```
+
+---
+
+## 🏋 Training
+
+```bash
+python main.py train \
+  --masked_dir   data/masked \
+  --unmasked_dir data/unmasked \
+  --epochs       100 \
+  --batch_size   4 \
+  --lr           0.0002 \
+  --lambda_l1    100 \
+  --lambda_percep 10 \
+  --save_every   10
+```
+
+Model checkpoints are saved to `saved_models/` every 10 epochs.  
+The best model by PSNR is saved as `generator_best.pth`.
+
+---
+
+## 📐 Evaluation Metrics
+
+```bash
+python main.py evaluate \
+  --model        saved_models/generator_best.pth \
+  --masked_dir   data/masked \
+  --unmasked_dir data/unmasked
+```
+
+| Metric | Description | Target |
+|--------|------------|--------|
+| PSNR | Peak Signal-to-Noise Ratio | > 25 dB |
+| SSIM | Structural Similarity | > 0.75 |
+| Precision | Discriminator precision | → 0.5 (balanced) |
+| Recall | Discriminator recall | → 0.5 (balanced) |
+| F1 | Harmonic mean | → 0.5 |
+
+---
+
+## 📜 License
+
+MIT License — see [LICENSE](LICENSE) for details.
