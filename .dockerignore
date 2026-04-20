@@ -1,0 +1,32 @@
+# Virtual environments
+venv/
+venv_gpu/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Dataset (VERY IMPORTANT)
+dataset/
+
+# Outputs
+results/
+test_results/
+*.png
+*.jpg
+*.jpeg
+
+# MLflow
+mlflow.db
+mlruns/
+
+# Git
+.git
+.gitignore
+
+# Models
+saved_models/*
+!saved_models/generator_best.pth
+
+# Misc
+*.log

@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: antidisguise_api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Optional: Mount saved models if you want to swap them without rebuilding
+      - ./saved_models:/app/saved_models
+    environment:
+      - MODEL_PATH=saved_models/generator_best.pth
+      - HOST=0.0.0.0
+      - PORT=8000
+    restart: unless-stopped
